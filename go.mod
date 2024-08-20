@@ -3,7 +3,7 @@ module github.com/0glabs/op-plasma-0g
 go 1.21.3
 
 require (
-	github.com/0glabs/0g-da-client/api v0.0.0-20240626082448-bd320f9a91d4
+	github.com/0glabs/0g-da-client/api v0.0.0-20240817035548-24388ba88e23
 	github.com/ethereum-optimism/optimism v1.7.7
 	github.com/ethereum/go-ethereum v1.13.15
 	github.com/urfave/cli/v2 v2.27.1

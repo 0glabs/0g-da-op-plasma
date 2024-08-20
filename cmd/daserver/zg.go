@@ -15,6 +15,7 @@ import (
 
 const VersionByte = 0x47
 const RequestTimeout = 180 * time.Second
+const SleepDuration = 3 * time.Second
 const MaxReties = 90
 
 type ZgConfig struct {
@@ -36,7 +37,8 @@ func NewZgStore(ctx context.Context, cfg ZgConfig, log log.Logger) (*ZgStore, er
 func (s *ZgStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	epoch := binary.LittleEndian.Uint64(key[2:10])
 	quorumId := binary.LittleEndian.Uint64(key[10:18])
-	commit := key[10:]
+	commit := key[18:]
+	s.log.Debug("Get blob for", "epoch", epoch, "quorum", quorumId, "commit", commit)
 
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, RequestTimeout)
 	defer cancel()
@@ -47,7 +49,7 @@ func (s *ZgStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024)), // 1 GiB
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial encoder: %w", err)
+		return nil, fmt.Errorf("failed to dial 0g da client: %w", err)
 	}
 	defer conn.Close()
 
@@ -74,16 +76,14 @@ func (s *ZgStore) Put(ctx context.Context, value []byte) ([]byte, error) {
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024)), // 1 GiB
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial encoder: %w", err)
+		return nil, fmt.Errorf("failed to dial 0g da client: %w", err)
 	}
 	defer conn.Close()
 
 	client := pb.NewDisperserClient(conn)
 
 	reply, err := client.DisperseBlob(ctx, &pb.DisperseBlobRequest{
-		Data:           value,
-		SecurityParams: []*pb.SecurityParams{},
-		TargetRowNum:   0,
+		Data: value,
 	})
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func (s *ZgStore) WaitBlobConfirmed(ctx context.Context, requestId []byte) ([]by
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024)), // 1 GiB
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial encoder: %w", err)
+		return nil, fmt.Errorf("failed to dial 0g da client: %w", err)
 	}
 	defer conn.Close()
 
@@ -121,7 +121,7 @@ func (s *ZgStore) WaitBlobConfirmed(ctx context.Context, requestId []byte) ([]by
 			}
 
 			log.Error("failed to get blob status", "err", err)
-			time.Sleep(3 * time.Second)
+			time.Sleep(SleepDuration)
 		}
 
 		status := blobStatus.GetStatus()
@@ -137,7 +137,7 @@ func (s *ZgStore) WaitBlobConfirmed(ctx context.Context, requestId []byte) ([]by
 			binary.LittleEndian.PutUint64(quorumId, blobHeader.GetQuorumId())
 			comm = append(comm, quorumId...)
 
-			comm = append(comm, blobHeader.GetDataRoot()...)
+			comm = append(comm, blobHeader.GetStorageRoot()...)
 			commitment := plasma.NewGenericCommitment(append([]byte{VersionByte}, comm...))
 			return commitment.Encode(), nil
 		}
@@ -148,9 +148,9 @@ func (s *ZgStore) WaitBlobConfirmed(ctx context.Context, requestId []byte) ([]by
 
 		retryCount++
 		if retryCount > MaxReties {
-			return nil, fmt.Errorf("failed to get blob status, retry reached")
+			return nil, fmt.Errorf("failed to get blob status, maximum retry reached")
 		}
 
-		time.Sleep(3 * time.Second)
+		time.Sleep(SleepDuration)
 	}
 }
