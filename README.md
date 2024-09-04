@@ -38,5 +38,19 @@ The `da-server` connects to a 0G DA client, which runs as a sidecar process.
 For guidance on setting up a 0G DA client, refer to the [documentation](https://docs.0g.ai/0g-doc/run-a-node/da-client).
 
 
+## Run with Docker
+Build the Docker image
+
+```bash
+docker build -t 0g-da-op-plasma .
+```
+
+Run the Docker container
+Adjust commands and parameters as required for your setup:
+
+```bash
+docker run -p 3100:3100 0g-da-op-plasma:latest da-server --addr 0.0.0.0 --port 3100 --zg.server 127.0.0.1:51001
+```
+
 ## Guidance to run OP Stack with 0G DA
 [How to Use the OP Stack with 0G DA](./OP%20Stack%20integration.md)

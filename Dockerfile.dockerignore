@@ -1,7 +1,6 @@
 *
-
-!/op-bindings
-!/op-service
-!/op-plasma
+!/Makefile
+!/*.go
+!/cmd
 !/go.mod
 !/go.sum
