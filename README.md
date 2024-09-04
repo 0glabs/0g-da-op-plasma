@@ -46,6 +46,7 @@ docker build -t 0g-da-op-plasma .
 ```
 
 Run the Docker container
+
 Adjust commands and parameters as required for your setup:
 
 ```bash

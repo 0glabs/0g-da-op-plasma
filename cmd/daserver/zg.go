@@ -23,14 +23,24 @@ type ZgConfig struct {
 }
 
 type ZgStore struct {
-	cfg ZgConfig
-	log log.Logger
+	cfg    ZgConfig
+	log    log.Logger
+	client pb.DisperserClient
 }
 
 func NewZgStore(ctx context.Context, cfg ZgConfig, log log.Logger) (*ZgStore, error) {
+	conn, err := grpc.NewClient(cfg.server, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024))) // 1 GiB
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial 0g da client: %w", err)
+	}
+	defer conn.Close()
+
+	client := pb.NewDisperserClient(conn)
+
 	return &ZgStore{
-		cfg: cfg,
-		log: log,
+		cfg:    cfg,
+		log:    log,
+		client: client,
 	}, nil
 }
 
@@ -40,16 +50,9 @@ func (s *ZgStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	commit := key[18:]
 	s.log.Debug("Get blob for", "epoch", epoch, "quorum", quorumId, "commit", commit)
 
-	conn, err := grpc.NewClient(s.cfg.server, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024))) // 1 GiB
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial 0g da client: %w", err)
-	}
-	defer conn.Close()
-
-	client := pb.NewDisperserClient(conn)
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, RequestTimeout)
 	defer cancel()
-	result, err := client.RetrieveBlob(ctxWithTimeout, &pb.RetrieveBlobRequest{
+	result, err := s.client.RetrieveBlob(ctxWithTimeout, &pb.RetrieveBlobRequest{
 		StorageRoot: commit,
 		Epoch:       epoch,
 		QuorumId:    quorumId,
@@ -62,31 +65,24 @@ func (s *ZgStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 func (s *ZgStore) Put(ctx context.Context, value []byte) ([]byte, error) {
-	conn, err := grpc.NewClient(s.cfg.server, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024))) // 1 GiB
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial 0g da client: %w", err)
-	}
-	defer conn.Close()
-
-	client := pb.NewDisperserClient(conn)
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, RequestTimeout)
 	defer cancel()
-	reply, err := client.DisperseBlob(ctxWithTimeout, &pb.DisperseBlobRequest{
+	reply, err := s.client.DisperseBlob(ctxWithTimeout, &pb.DisperseBlobRequest{
 		Data: value,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return s.WaitBlobConfirmed(ctx, client, reply.GetRequestId())
+	return s.WaitBlobConfirmed(ctx, reply.GetRequestId())
 }
 
-func (s *ZgStore) WaitBlobConfirmed(ctx context.Context, client pb.DisperserClient, requestId []byte) ([]byte, error) {
+func (s *ZgStore) WaitBlobConfirmed(ctx context.Context, requestId []byte) ([]byte, error) {
 	var retryCount uint64
 	for {
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, RequestTimeout)
 		defer cancel()
-		blobStatus, err := client.GetBlobStatus(ctxWithTimeout, &pb.BlobStatusRequest{
+		blobStatus, err := s.client.GetBlobStatus(ctxWithTimeout, &pb.BlobStatusRequest{
 			RequestId: requestId,
 		})
 
