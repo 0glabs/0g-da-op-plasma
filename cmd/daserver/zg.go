@@ -40,21 +40,16 @@ func (s *ZgStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	commit := key[18:]
 	s.log.Debug("Get blob for", "epoch", epoch, "quorum", quorumId, "commit", commit)
 
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, RequestTimeout)
-	defer cancel()
-	conn, err := grpc.DialContext(
-		ctxWithTimeout,
-		s.cfg.server,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024)), // 1 GiB
-	)
+	conn, err := grpc.NewClient(s.cfg.server, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024))) // 1 GiB
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial 0g da client: %w", err)
 	}
 	defer conn.Close()
 
 	client := pb.NewDisperserClient(conn)
-	result, err := client.RetrieveBlob(ctx, &pb.RetrieveBlobRequest{
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, RequestTimeout)
+	defer cancel()
+	result, err := client.RetrieveBlob(ctxWithTimeout, &pb.RetrieveBlobRequest{
 		StorageRoot: commit,
 		Epoch:       epoch,
 		QuorumId:    quorumId,
@@ -67,50 +62,31 @@ func (s *ZgStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 func (s *ZgStore) Put(ctx context.Context, value []byte) ([]byte, error) {
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, RequestTimeout)
-	defer cancel()
-	conn, err := grpc.DialContext(
-		ctxWithTimeout,
-		s.cfg.server,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024)), // 1 GiB
-	)
+	conn, err := grpc.NewClient(s.cfg.server, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024))) // 1 GiB
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial 0g da client: %w", err)
 	}
 	defer conn.Close()
 
 	client := pb.NewDisperserClient(conn)
-
-	reply, err := client.DisperseBlob(ctx, &pb.DisperseBlobRequest{
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, RequestTimeout)
+	defer cancel()
+	reply, err := client.DisperseBlob(ctxWithTimeout, &pb.DisperseBlobRequest{
 		Data: value,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return s.WaitBlobConfirmed(ctx, reply.GetRequestId())
+	return s.WaitBlobConfirmed(ctx, client, reply.GetRequestId())
 }
 
-func (s *ZgStore) WaitBlobConfirmed(ctx context.Context, requestId []byte) ([]byte, error) {
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, RequestTimeout*2)
-	defer cancel()
-	conn, err := grpc.DialContext(
-		ctxWithTimeout,
-		s.cfg.server,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024)), // 1 GiB
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial 0g da client: %w", err)
-	}
-	defer conn.Close()
-
-	client := pb.NewDisperserClient(conn)
-
+func (s *ZgStore) WaitBlobConfirmed(ctx context.Context, client pb.DisperserClient, requestId []byte) ([]byte, error) {
 	var retryCount uint64
 	for {
-		blobStatus, err := client.GetBlobStatus(ctx, &pb.BlobStatusRequest{
+		ctxWithTimeout, cancel := context.WithTimeout(ctx, RequestTimeout)
+		defer cancel()
+		blobStatus, err := client.GetBlobStatus(ctxWithTimeout, &pb.BlobStatusRequest{
 			RequestId: requestId,
 		})
 
@@ -125,7 +101,7 @@ func (s *ZgStore) WaitBlobConfirmed(ctx context.Context, requestId []byte) ([]by
 		}
 
 		status := blobStatus.GetStatus()
-		if status == pb.BlobStatus_CONFIRMED || status == pb.BlobStatus_FINALIZED {
+		if status == pb.BlobStatus_FINALIZED {
 			blobHeader := blobStatus.GetInfo().GetBlobHeader()
 
 			var comm []byte
