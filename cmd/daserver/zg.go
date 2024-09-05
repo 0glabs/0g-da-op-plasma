@@ -33,7 +33,6 @@ func NewZgStore(ctx context.Context, cfg ZgConfig, log log.Logger) (*ZgStore, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial 0g da client: %w", err)
 	}
-	defer conn.Close()
 
 	client := pb.NewDisperserClient(conn)
 
