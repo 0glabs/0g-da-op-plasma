@@ -12,13 +12,14 @@ Ensure you have installed the following software.
 
 | Software | Version    |
 | -------- | ---------- |
-| Git      | OS default |
-| Go       | 1.21.6     |
+| Git      | 2.34.1     |
+| Go       | 1.23.3     |
 | Node     | ^20        |
 | just     | 1.34.0     |
-| Make     | OS default |
-| jq       | OS default |
-| direnv   | Latest     |
+| Make     | 4.3        |
+| jq       | 1.6        |
+| direnv   | 2.25.2     |
+| foundry  | 0.2.0      |
 
 Use the following releases while following the guide:
 * op-node/v1.9.1
@@ -76,9 +77,53 @@ git submodule update --init --recursive
 ```
 
 2. Check your dependencies
+```bash
+# Install Git
+sudo apt install -y git curl make jq
+ 
+# Install Go
+wget https://go.dev/dl/go1.23.3 linux-amd64.tar.gz
+tar xvzf go1.23.3 linux-amd64.tar.gz
+sudo cp go/bin/go /usr/bin/go
+sudo mv go /usr/lib
+echo export GOROOT=/usr/lib/go >> ~/.bashrc
+ 
+# Install Node.js
+curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+sudo apt-get install -y nodejs
+ 
+# Install Pnpm
+sudo npm install -g pnpm
+ 
+# Install Make
+sudo apt install -y make
+ 
+# Install jq
+sudo apt install -y jq
+ 
+# Install direnv
+sudo apt install -y direnv
+
+# install just
+sudo apt install cargo
+cargo install just
+
+# install semgrep
+sudo apt install snapd
+sudo snap install semgrep
+sudo apt install python3-pip
+python3 -m pip install --upgrade pip
+python3 -m pip install semgrep==1.90.0
+sudo apt-get install python3-virtualenv
+python3 -m virtualenv myenv
+source myenv/bin/activate
+python3 -m pip install --upgrade semgrep
+
+# install foundry
+cargo install --git https://github.com/foundry-rs/foundry --profile release --locked forge cast chisel anvil
+```bash
 
 Run the following script and double check that you have all of the required versions installed. If you don't have the correct versions installed, you may run into unexpected errors.
-
 ```bash
 ./packages/contracts-bedrock/scripts/getting-started/versions.sh
 ```
@@ -95,6 +140,7 @@ make build
 1. Clone and navigate to op-geth:
 
 ```bash
+cd
 git clone https://github.com/ethereum-optimism/op-geth.git
 cd op-geth
 git fetch --tag --all
@@ -156,7 +202,7 @@ cd ~/optimism/packages/contracts-bedrock
 2. Generate accounts:
 
 ```bash
-./packages/contracts-bedrock/scripts/getting-started/wallets.sh
+./scripts/getting-started/wallets.sh
 ```
 
 You should see an output similar to:
@@ -205,6 +251,7 @@ cd ~/optimism
 Next you'll need to allow direnv to read this file and load the variables into your terminal using the following command.
 
 ```bash
+eval "$(direnv hook bash)"
 direnv allow
 ```
 
@@ -340,7 +387,7 @@ forge script scripts/deploy/Deploy.s.sol:Deploy  --broadcast --private-key $GS_A
 3. L2 Allocs
 
 ```bash
-CONTRACT_ADDRESSES_PATH=deployments/artifact.json DEPLOY_CONFIG_PATH=deploy-config/getting-started.json STATE_DUMP_PATH=deploy-config/statedump.json forge script scripts/L2Genesis.s.sol:L2Genesis --sig 'runWithStateDump()' --chain <YOUR_L2_CHAINID>
+CONTRACT_ADDRESSES_PATH=deployments/artifact.json DEPLOY_CONFIG_PATH=deploy-config/getting-started.json STATE_DUMP_PATH=deploy-config/statedump.json forge script scripts/L2Genesis.s.sol:L2Genesis --sig 'runWithStateDump()' --chain 42069
 ```
 
 # Setting Up L2 Configuration
@@ -445,7 +492,7 @@ cd ~/op-geth
   --authrpc.port=9551 \
   --authrpc.jwtsecret=./jwt.txt \
   --rollup.disabletxpoolgossip=true \
-  --state.scheme=hash
+  --state.scheme=path
 ```
 
 `op-geth` is now active, but block creation will begin once `op-node` is operational.
@@ -528,7 +575,7 @@ cd ~/optimism/op-proposer
   --rollup-rpc=http://localhost:8547 \
   --l2oo-address=$L2OO_ADDR \
   --private-key=$PROPOSER_KEY \
-  --l1-eth-rpc=$L1_RPC
+  --l1-eth-rpc=$L1_RPC_URL
 ```
 
 # Acquire Sepolia ETH for Layer 2
