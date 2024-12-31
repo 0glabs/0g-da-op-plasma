@@ -25,13 +25,13 @@ The Optimism 0G integration allows developers to deploy an OP Stack Rollup using
 
 ### Documentation
 
-To get started with the Optimism 0G implementation, please refer to the [OP Stack on 0G DA Documentation](https://docs.0g.org/build-with-0g/rollups-and-appchains/op-stack-on-0g-da).
+To get started with the Optimism 0G implementation, please refer to the [OP Stack on 0G DA Documentation](https://docs.0g.ai/build-with-0g/rollups-and-appchains/op-stack-on-0g-da).
 
 ### Learn More About 0G
 
-[0G Website](https://0g.org/)
-[0G Github](https://github.com/0g-project/0g)
+- [0G Website](https://0g.ai/)
+- [0G Github](https://github.com/0glabs)
 
-### Learn More About Arbitrum Orbit
+### Learn More About OP Stack
 
-[OP Stack Docs](https://developer.arbitrum.io/orbit)
+[OP Stack Docs](https://docs.optimism.io/stack/getting-started)
